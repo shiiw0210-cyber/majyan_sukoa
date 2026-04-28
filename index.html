@@ -1,1 +1,471 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>麻雀スコア集計</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    margin: 0;
+    padding: 16px;
+    background: #f4f6f8;
+    color: #222;
+  }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 12px;
+    text-align: center;
+    color: #1f3a5f;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .card h2 {
+    font-size: 1rem;
+    margin: 0 0 10px;
+    color: #1f3a5f;
+    border-left: 4px solid #1f3a5f;
+    padding-left: 8px;
+  }
+  label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
+    color: #555;
+  }
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: #fafafa;
+  }
+  input[type="number"] {
+    text-align: right;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  .settings-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  @media (max-width: 600px) {
+    .settings-row { grid-template-columns: 1fr; }
+  }
+  button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn-primary { background: #1f3a5f; color: #fff; }
+  .btn-primary:hover { background: #2a4d7a; }
+  .btn-danger  { background: #c0392b; color: #fff; }
+  .btn-danger:hover  { background: #d4493a; }
+  .btn-sub     { background: #e0e0e0; color: #333; }
+  .btn-sub:hover     { background: #d0d0d0; }
+  .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 8px 6px;
+    text-align: center;
+    border-bottom: 1px solid #eee;
+  }
+  th {
+    background: #f0f3f7;
+    color: #1f3a5f;
+    font-weight: 600;
+  }
+  tr.total-row td {
+    font-weight: 700;
+    background: #fff8e1;
+    border-top: 2px solid #1f3a5f;
+    font-size: 1rem;
+  }
+  .plus  { color: #1565c0; }
+  .minus { color: #c62828; }
+  .small {
+    font-size: 0.78rem;
+    color: #777;
+  }
+  .preview {
+    background: #f0f7ff;
+    border: 1px dashed #6fa8dc;
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 8px;
+    font-size: 0.9rem;
+  }
+  .delete-btn {
+    background: none;
+    border: none;
+    color: #c62828;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 4px;
+  }
+  .sum-warn {
+    color: #c62828;
+    font-size: 0.85rem;
+    margin-top: 4px;
+    min-height: 1.2em;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🀄 麻雀スコア集計</h1>
 
+  <!-- 設定 -->
+  <div class="card">
+    <h2>設定</h2>
+    <div class="settings-row">
+      <div>
+        <label>配給原点（持ち点）</label>
+        <input type="number" id="startPoint" value="25000" step="1000">
+      </div>
+      <div>
+        <label>返し点（原点）</label>
+        <input type="number" id="returnPoint" value="30000" step="1000">
+      </div>
+      <div>
+        <label>ウマ（2位 / 1位）</label>
+        <div style="display:flex; gap:6px;">
+          <input type="number" id="uma2" value="10">
+          <input type="number" id="uma1" value="20">
+        </div>
+        <div class="small">3位は -[2位] / 4位は -[1位]</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- プレイヤー -->
+  <div class="card">
+    <h2>プレイヤー名</h2>
+    <div class="grid">
+      <div><label>東家</label><input type="text" id="p0" value="プレイヤー1"></div>
+      <div><label>南家</label><input type="text" id="p1" value="プレイヤー2"></div>
+      <div><label>西家</label><input type="text" id="p2" value="プレイヤー3"></div>
+      <div><label>北家</label><input type="text" id="p3" value="プレイヤー4"></div>
+    </div>
+  </div>
+
+  <!-- スコア入力 -->
+  <div class="card">
+    <h2>スコア入力（素点）</h2>
+    <div class="grid">
+      <div><label id="lp0">プレイヤー1</label><input type="number" id="s0" step="100" placeholder="例: 32000"></div>
+      <div><label id="lp1">プレイヤー2</label><input type="number" id="s1" step="100" placeholder="例: 28000"></div>
+      <div><label id="lp2">プレイヤー3</label><input type="number" id="s2" step="100" placeholder="例: 22000"></div>
+      <div><label id="lp3">プレイヤー4</label><input type="number" id="s3" step="100" placeholder="例: 18000"></div>
+    </div>
+    <div class="sum-warn" id="sumWarn"></div>
+    <div class="preview" id="preview" style="display:none;"></div>
+    <div class="actions">
+      <button class="btn-primary" id="addBtn">この半荘を追加</button>
+      <button class="btn-sub" id="clearInputBtn">入力クリア</button>
+    </div>
+  </div>
+
+  <!-- 履歴・集計 -->
+  <div class="card">
+    <h2>集計結果</h2>
+    <div style="overflow-x:auto;">
+      <table id="resultTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th id="hp0">プレイヤー1</th>
+            <th id="hp1">プレイヤー2</th>
+            <th id="hp2">プレイヤー3</th>
+            <th id="hp3">プレイヤー4</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="btn-danger" id="resetBtn">全履歴リセット</button>
+    </div>
+    <div class="small" style="margin-top:8px;">
+      ※ スコアはデータが自動保存されます（このブラウザ内）。<br>
+      ※ ポイント計算式: (素点 − 返し点) ÷ 1000 + ウマ。1位はオカ（(返し点 − 配給原点) × 4 ÷ 1000）も加算。
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'mahjong_score_app_v1';
+
+  const $ = (id) => document.getElementById(id);
+  const ids = {
+    start:   'startPoint',
+    ret:     'returnPoint',
+    uma1:    'uma1',
+    uma2:    'uma2',
+    players: ['p0','p1','p2','p3'],
+    scores:  ['s0','s1','s2','s3'],
+    labels:  ['lp0','lp1','lp2','lp3'],
+    headers: ['hp0','hp1','hp2','hp3']
+  };
+
+  let state = {
+    settings: { start: 25000, ret: 30000, uma1: 20, uma2: 10 },
+    players: ['プレイヤー1','プレイヤー2','プレイヤー3','プレイヤー4'],
+    games: []  // { scores:[4], points:[4] }
+  };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d && d.settings && d.players && d.games) state = d;
+      }
+    } catch(e) {}
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  }
+
+  function applyToInputs() {
+    $(ids.start).value = state.settings.start;
+    $(ids.ret).value   = state.settings.ret;
+    $(ids.uma1).value  = state.settings.uma1;
+    $(ids.uma2).value  = state.settings.uma2;
+    state.players.forEach((n,i) => $(ids.players[i]).value = n);
+  }
+
+  function readSettings() {
+    state.settings.start = num($(ids.start).value, 25000);
+    state.settings.ret   = num($(ids.ret).value, 30000);
+    state.settings.uma1  = num($(ids.uma1).value, 20);
+    state.settings.uma2  = num($(ids.uma2).value, 10);
+    state.players = ids.players.map(id => $(id).value.trim() || '名無し');
+  }
+
+  function num(v, def) {
+    const n = parseFloat(v);
+    return isNaN(n) ? def : n;
+  }
+
+  // 素点 → ポイント計算
+  // 1) 順位を確定（同点はインデックス順）
+  // 2) 各人 (素点 - 返し点) / 1000
+  // 3) ウマ加算: 1位 +uma1, 2位 +uma2, 3位 -uma2, 4位 -uma1
+  // 4) 1位はオカ (返し点 - 配給原点) * 4 / 1000 を加算
+  // 5) 端数は四捨五入。合計0にならない場合、1位で調整。
+  function calcPoints(scores, settings) {
+    const idx = scores.map((s,i) => i).sort((a,b) => scores[b] - scores[a]);
+    const ranks = new Array(4);
+    idx.forEach((origIdx, rank) => { ranks[origIdx] = rank; });
+
+    const umas = [settings.uma1, settings.uma2, -settings.uma2, -settings.uma1];
+    const oka  = (settings.ret - settings.start) * 4 / 1000;
+
+    let pts = scores.map((s,i) => {
+      let p = (s - settings.ret) / 1000 + umas[ranks[i]];
+      if (ranks[i] === 0) p += oka;
+      return p;
+    });
+    // 四捨五入（小数点1位）
+    pts = pts.map(p => Math.round(p * 10) / 10);
+    // 合計0調整（1位に寄せる）
+    const sum = pts.reduce((a,b) => a + b, 0);
+    if (Math.abs(sum) > 0.0001) {
+      const topIdx = idx[0];
+      pts[topIdx] = Math.round((pts[topIdx] - sum) * 10) / 10;
+    }
+    return pts;
+  }
+
+  function fmt(p) {
+    if (p === 0 || Object.is(p, -0)) return '0.0';
+    const s = (p > 0 ? '+' : '') + p.toFixed(1);
+    return s;
+  }
+
+  function updatePlayerLabels() {
+    state.players.forEach((n,i) => {
+      $(ids.labels[i]).textContent  = n;
+      $(ids.headers[i]).textContent = n;
+    });
+  }
+
+  function updatePreview() {
+    const scores = ids.scores.map(id => $(id).value);
+    const filled = scores.filter(v => v !== '' && !isNaN(parseFloat(v)));
+    const warnEl = $('sumWarn');
+    const prev = $('preview');
+
+    if (filled.length === 0) {
+      warnEl.textContent = '';
+      prev.style.display = 'none';
+      return;
+    }
+    if (filled.length < 4) {
+      warnEl.textContent = '';
+      prev.style.display = 'none';
+      return;
+    }
+    readSettings();
+    const nums = scores.map(v => parseFloat(v));
+    const sum = nums.reduce((a,b) => a + b, 0);
+    const expected = state.settings.start * 4;
+    if (sum !== expected) {
+      warnEl.textContent = `素点の合計が ${expected.toLocaleString()} になっていません（現在: ${sum.toLocaleString()}）`;
+      prev.style.display = 'none';
+      return;
+    }
+    warnEl.textContent = '';
+    const pts = calcPoints(nums, state.settings);
+    prev.style.display = 'block';
+    prev.innerHTML = '<b>計算プレビュー:</b> ' +
+      state.players.map((n,i) =>
+        `${n}: <span class="${pts[i] >= 0 ? 'plus' : 'minus'}">${fmt(pts[i])}</span>`
+      ).join(' / ');
+  }
+
+  function render() {
+    updatePlayerLabels();
+    const tbody = $('resultBody');
+    tbody.innerHTML = '';
+    const totals = [0,0,0,0];
+
+    state.games.forEach((g, gi) => {
+      const tr = document.createElement('tr');
+      let html = `<td>${gi+1}</td>`;
+      g.points.forEach((p,i) => {
+        totals[i] += p;
+        html += `<td class="${p >= 0 ? 'plus' : 'minus'}">${fmt(p)}<div class="small">(${g.scores[i].toLocaleString()})</div></td>`;
+      });
+      html += `<td><button class="delete-btn" data-idx="${gi}" title="削除">✕</button></td>`;
+      tr.innerHTML = html;
+      tbody.appendChild(tr);
+    });
+
+    if (state.games.length > 0) {
+      const tr = document.createElement('tr');
+      tr.className = 'total-row';
+      let html = '<td>合計</td>';
+      const rounded = totals.map(t => Math.round(t * 10) / 10);
+      rounded.forEach(t => {
+        html += `<td class="${t >= 0 ? 'plus' : 'minus'}">${fmt(t)}</td>`;
+      });
+      html += '<td></td>';
+      tr.innerHTML = html;
+      tbody.appendChild(tr);
+    } else {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="6" class="small" style="padding:16px;">まだ記録がありません</td>';
+      tbody.appendChild(tr);
+    }
+
+    tbody.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.getAttribute('data-idx'), 10);
+        if (confirm(`#${idx+1} の記録を削除しますか？`)) {
+          state.games.splice(idx, 1);
+          save();
+          render();
+        }
+      });
+    });
+  }
+
+  function addGame() {
+    readSettings();
+    const scores = ids.scores.map(id => $(id).value);
+    if (scores.some(v => v === '' || isNaN(parseFloat(v)))) {
+      alert('4人分の素点を入力してください。');
+      return;
+    }
+    const nums = scores.map(v => parseFloat(v));
+    const sum = nums.reduce((a,b) => a + b, 0);
+    const expected = state.settings.start * 4;
+    if (sum !== expected) {
+      if (!confirm(`素点の合計が ${expected.toLocaleString()} ではありません（${sum.toLocaleString()}）。\nこのまま追加しますか？`)) {
+        return;
+      }
+    }
+    const points = calcPoints(nums, state.settings);
+    state.games.push({ scores: nums, points: points });
+    save();
+    ids.scores.forEach(id => $(id).value = '');
+    updatePreview();
+    render();
+  }
+
+  function clearInputs() {
+    ids.scores.forEach(id => $(id).value = '');
+    updatePreview();
+  }
+
+  function resetAll() {
+    if (!confirm('すべての履歴を削除します。よろしいですか？')) return;
+    state.games = [];
+    save();
+    render();
+  }
+
+  // イベント登録
+  document.addEventListener('DOMContentLoaded', () => {
+    load();
+    applyToInputs();
+    render();
+    updatePreview();
+
+    $('addBtn').addEventListener('click', addGame);
+    $('clearInputBtn').addEventListener('click', clearInputs);
+    $('resetBtn').addEventListener('click', resetAll);
+
+    // 設定・名前変更で保存＆再描画
+    [ids.start, ids.ret, ids.uma1, ids.uma2, ...ids.players].forEach(id => {
+      $(id).addEventListener('input', () => {
+        readSettings();
+        save();
+        updatePlayerLabels();
+        updatePreview();
+      });
+    });
+    // 素点入力でプレビュー更新
+    ids.scores.forEach(id => {
+      $(id).addEventListener('input', updatePreview);
+    });
+  });
+})();
+</script>
+</body>
+</html>
