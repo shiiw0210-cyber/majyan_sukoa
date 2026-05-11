@@ -62,14 +62,37 @@
   @media (max-width: 600px) {
     .grid { grid-template-columns: repeat(2, 1fr); }
   }
-  .settings-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+  .rule-tabs {
+    display: flex;
     gap: 8px;
   }
-  @media (max-width: 600px) {
-    .settings-row { grid-template-columns: 1fr; }
+  .rule-tab {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    background: #fafafa;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #555;
+    transition: all 0.15s;
   }
+  .rule-tab:hover { background: #f0f0f0; }
+  .rule-tab.active {
+    border-color: #1f3a5f;
+    background: #e8f0fa;
+    color: #1f3a5f;
+  }
+  .rule-tab .sub {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #888;
+    margin-top: 2px;
+  }
+  .rule-tab.active .sub { color: #1f3a5f; }
   button {
     padding: 10px 16px;
     border: none;
@@ -110,7 +133,7 @@
     font-weight: 700;
     background: #fff8e1;
     border-top: 2px solid #1f3a5f;
-    font-size: 1rem;
+    font-size: 1.05rem;
   }
   .plus  { color: #1565c0; }
   .minus { color: #c62828; }
@@ -137,7 +160,7 @@
   .sum-warn {
     color: #c62828;
     font-size: 0.85rem;
-    margin-top: 4px;
+    margin-top: 6px;
     min-height: 1.2em;
   }
 </style>
@@ -146,25 +169,17 @@
 <div class="container">
   <h1>🀄 麻雀スコア集計</h1>
 
-  <!-- 設定 -->
+  <!-- ルール選択 -->
   <div class="card">
-    <h2>設定</h2>
-    <div class="settings-row">
-      <div>
-        <label>配給原点（持ち点）</label>
-        <input type="number" id="startPoint" value="25000" step="1000">
+    <h2>ルール選択</h2>
+    <div class="rule-tabs">
+      <div class="rule-tab active" data-rule="40">
+        4万点返し
+        <span class="sub">25,000持ち / 40,000返し / ウマ 10-20</span>
       </div>
-      <div>
-        <label>返し点（原点）</label>
-        <input type="number" id="returnPoint" value="30000" step="1000">
-      </div>
-      <div>
-        <label>ウマ（2位 / 1位）</label>
-        <div style="display:flex; gap:6px;">
-          <input type="number" id="uma2" value="10">
-          <input type="number" id="uma1" value="20">
-        </div>
-        <div class="small">3位は -[2位] / 4位は -[1位]</div>
+      <div class="rule-tab" data-rule="35">
+        3万5千点返し
+        <span class="sub">25,000持ち / 35,000返し / ウマ 10-20</span>
       </div>
     </div>
   </div>
@@ -173,16 +188,16 @@
   <div class="card">
     <h2>プレイヤー名</h2>
     <div class="grid">
-      <div><label>東家</label><input type="text" id="p0" value="プレイヤー1"></div>
-      <div><label>南家</label><input type="text" id="p1" value="プレイヤー2"></div>
-      <div><label>西家</label><input type="text" id="p2" value="プレイヤー3"></div>
-      <div><label>北家</label><input type="text" id="p3" value="プレイヤー4"></div>
+      <div><label>1人目</label><input type="text" id="p0" value="プレイヤー1"></div>
+      <div><label>2人目</label><input type="text" id="p1" value="プレイヤー2"></div>
+      <div><label>3人目</label><input type="text" id="p2" value="プレイヤー3"></div>
+      <div><label>4人目</label><input type="text" id="p3" value="プレイヤー4"></div>
     </div>
   </div>
 
   <!-- スコア入力 -->
   <div class="card">
-    <h2>スコア入力（素点）</h2>
+    <h2>1半荘のスコア入力（素点）</h2>
     <div class="grid">
       <div><label id="lp0">プレイヤー1</label><input type="number" id="s0" step="100" placeholder="例: 32000"></div>
       <div><label id="lp1">プレイヤー2</label><input type="number" id="s1" step="100" placeholder="例: 28000"></div>
@@ -199,7 +214,7 @@
 
   <!-- 履歴・集計 -->
   <div class="card">
-    <h2>集計結果</h2>
+    <h2>集計（半荘ごとの履歴と累計）</h2>
     <div style="overflow-x:auto;">
       <table id="resultTable">
         <thead>
@@ -219,22 +234,24 @@
       <button class="btn-danger" id="resetBtn">全履歴リセット</button>
     </div>
     <div class="small" style="margin-top:8px;">
-      ※ スコアはデータが自動保存されます（このブラウザ内）。<br>
-      ※ ポイント計算式: (素点 − 返し点) ÷ 1000 + ウマ。1位はオカ（(返し点 − 配給原点) × 4 ÷ 1000）も加算。
+      ※ 入力データはこのブラウザに自動保存されます。<br>
+      ※ ポイント = (素点 − 返し点) ÷ 1000 + ウマ。1位はオカ加算。合計が0になるよう1位で端数調整します。
     </div>
   </div>
 </div>
 
 <script>
 (function() {
-  const STORAGE_KEY = 'mahjong_score_app_v1';
+  const STORAGE_KEY = 'mahjong_score_app_v2';
+
+  // 2つのルールプリセット
+  const RULES = {
+    '40': { label: '4万点返し', start: 25000, ret: 40000, uma1: 20, uma2: 10 },
+    '35': { label: '3万5千点返し', start: 25000, ret: 35000, uma1: 20, uma2: 10 }
+  };
 
   const $ = (id) => document.getElementById(id);
   const ids = {
-    start:   'startPoint',
-    ret:     'returnPoint',
-    uma1:    'uma1',
-    uma2:    'uma2',
     players: ['p0','p1','p2','p3'],
     scores:  ['s0','s1','s2','s3'],
     labels:  ['lp0','lp1','lp2','lp3'],
@@ -242,9 +259,9 @@
   };
 
   let state = {
-    settings: { start: 25000, ret: 30000, uma1: 20, uma2: 10 },
+    rule: '40',
     players: ['プレイヤー1','プレイヤー2','プレイヤー3','プレイヤー4'],
-    games: []  // { scores:[4], points:[4] }
+    games: []  // { rule, scores:[4], points:[4] }
   };
 
   function load() {
@@ -252,7 +269,7 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const d = JSON.parse(raw);
-        if (d && d.settings && d.players && d.games) state = d;
+        if (d && d.rule && d.players && d.games) state = d;
       }
     } catch(e) {}
   }
@@ -260,49 +277,30 @@
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
   }
 
-  function applyToInputs() {
-    $(ids.start).value = state.settings.start;
-    $(ids.ret).value   = state.settings.ret;
-    $(ids.uma1).value  = state.settings.uma1;
-    $(ids.uma2).value  = state.settings.uma2;
-    state.players.forEach((n,i) => $(ids.players[i]).value = n);
+  function currentRule() {
+    return RULES[state.rule] || RULES['40'];
   }
 
-  function readSettings() {
-    state.settings.start = num($(ids.start).value, 25000);
-    state.settings.ret   = num($(ids.ret).value, 30000);
-    state.settings.uma1  = num($(ids.uma1).value, 20);
-    state.settings.uma2  = num($(ids.uma2).value, 10);
-    state.players = ids.players.map(id => $(id).value.trim() || '名無し');
-  }
-
-  function num(v, def) {
-    const n = parseFloat(v);
-    return isNaN(n) ? def : n;
-  }
-
-  // 素点 → ポイント計算
+  // ポイント計算
   // 1) 順位を確定（同点はインデックス順）
-  // 2) 各人 (素点 - 返し点) / 1000
+  // 2) (素点 − 返し点) / 1000
   // 3) ウマ加算: 1位 +uma1, 2位 +uma2, 3位 -uma2, 4位 -uma1
-  // 4) 1位はオカ (返し点 - 配給原点) * 4 / 1000 を加算
-  // 5) 端数は四捨五入。合計0にならない場合、1位で調整。
-  function calcPoints(scores, settings) {
+  // 4) 1位はオカ (返し点 − 配給原点) × 4 / 1000 を加算
+  // 5) 小数1位で四捨五入。合計が0からズレた分は1位で調整。
+  function calcPoints(scores, rule) {
     const idx = scores.map((s,i) => i).sort((a,b) => scores[b] - scores[a]);
     const ranks = new Array(4);
     idx.forEach((origIdx, rank) => { ranks[origIdx] = rank; });
 
-    const umas = [settings.uma1, settings.uma2, -settings.uma2, -settings.uma1];
-    const oka  = (settings.ret - settings.start) * 4 / 1000;
+    const umas = [rule.uma1, rule.uma2, -rule.uma2, -rule.uma1];
+    const oka  = (rule.ret - rule.start) * 4 / 1000;
 
     let pts = scores.map((s,i) => {
-      let p = (s - settings.ret) / 1000 + umas[ranks[i]];
+      let p = (s - rule.ret) / 1000 + umas[ranks[i]];
       if (ranks[i] === 0) p += oka;
       return p;
     });
-    // 四捨五入（小数点1位）
     pts = pts.map(p => Math.round(p * 10) / 10);
-    // 合計0調整（1位に寄せる）
     const sum = pts.reduce((a,b) => a + b, 0);
     if (Math.abs(sum) > 0.0001) {
       const topIdx = idx[0];
@@ -313,8 +311,7 @@
 
   function fmt(p) {
     if (p === 0 || Object.is(p, -0)) return '0.0';
-    const s = (p > 0 ? '+' : '') + p.toFixed(1);
-    return s;
+    return (p > 0 ? '+' : '') + p.toFixed(1);
   }
 
   function updatePlayerLabels() {
@@ -324,33 +321,38 @@
     });
   }
 
+  function updateRuleTabs() {
+    document.querySelectorAll('.rule-tab').forEach(el => {
+      el.classList.toggle('active', el.dataset.rule === state.rule);
+    });
+  }
+
+  function readPlayers() {
+    state.players = ids.players.map(id => $(id).value.trim() || '名無し');
+  }
+
   function updatePreview() {
     const scores = ids.scores.map(id => $(id).value);
-    const filled = scores.filter(v => v !== '' && !isNaN(parseFloat(v)));
     const warnEl = $('sumWarn');
     const prev = $('preview');
+    const filled = scores.filter(v => v !== '' && !isNaN(parseFloat(v)));
 
-    if (filled.length === 0) {
-      warnEl.textContent = '';
-      prev.style.display = 'none';
-      return;
-    }
     if (filled.length < 4) {
       warnEl.textContent = '';
       prev.style.display = 'none';
       return;
     }
-    readSettings();
+    const rule = currentRule();
     const nums = scores.map(v => parseFloat(v));
     const sum = nums.reduce((a,b) => a + b, 0);
-    const expected = state.settings.start * 4;
+    const expected = rule.start * 4;
     if (sum !== expected) {
       warnEl.textContent = `素点の合計が ${expected.toLocaleString()} になっていません（現在: ${sum.toLocaleString()}）`;
       prev.style.display = 'none';
       return;
     }
     warnEl.textContent = '';
-    const pts = calcPoints(nums, state.settings);
+    const pts = calcPoints(nums, rule);
     prev.style.display = 'block';
     prev.innerHTML = '<b>計算プレビュー:</b> ' +
       state.players.map((n,i) =>
@@ -360,6 +362,8 @@
 
   function render() {
     updatePlayerLabels();
+    updateRuleTabs();
+
     const tbody = $('resultBody');
     tbody.innerHTML = '';
     const totals = [0,0,0,0];
@@ -379,7 +383,7 @@
     if (state.games.length > 0) {
       const tr = document.createElement('tr');
       tr.className = 'total-row';
-      let html = '<td>合計</td>';
+      let html = `<td>合計<div class="small">(${state.games.length}半荘)</div></td>`;
       const rounded = totals.map(t => Math.round(t * 10) / 10);
       rounded.forEach(t => {
         html += `<td class="${t >= 0 ? 'plus' : 'minus'}">${fmt(t)}</td>`;
@@ -406,7 +410,8 @@
   }
 
   function addGame() {
-    readSettings();
+    readPlayers();
+    const rule = currentRule();
     const scores = ids.scores.map(id => $(id).value);
     if (scores.some(v => v === '' || isNaN(parseFloat(v)))) {
       alert('4人分の素点を入力してください。');
@@ -414,14 +419,14 @@
     }
     const nums = scores.map(v => parseFloat(v));
     const sum = nums.reduce((a,b) => a + b, 0);
-    const expected = state.settings.start * 4;
+    const expected = rule.start * 4;
     if (sum !== expected) {
       if (!confirm(`素点の合計が ${expected.toLocaleString()} ではありません（${sum.toLocaleString()}）。\nこのまま追加しますか？`)) {
         return;
       }
     }
-    const points = calcPoints(nums, state.settings);
-    state.games.push({ scores: nums, points: points });
+    const points = calcPoints(nums, rule);
+    state.games.push({ rule: state.rule, scores: nums, points: points });
     save();
     ids.scores.forEach(id => $(id).value = '');
     updatePreview();
@@ -440,10 +445,9 @@
     render();
   }
 
-  // イベント登録
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    applyToInputs();
+    state.players.forEach((n,i) => $(ids.players[i]).value = n);
     render();
     updatePreview();
 
@@ -451,16 +455,24 @@
     $('clearInputBtn').addEventListener('click', clearInputs);
     $('resetBtn').addEventListener('click', resetAll);
 
-    // 設定・名前変更で保存＆再描画
-    [ids.start, ids.ret, ids.uma1, ids.uma2, ...ids.players].forEach(id => {
+    document.querySelectorAll('.rule-tab').forEach(el => {
+      el.addEventListener('click', () => {
+        state.rule = el.dataset.rule;
+        save();
+        updateRuleTabs();
+        updatePreview();
+      });
+    });
+
+    ids.players.forEach(id => {
       $(id).addEventListener('input', () => {
-        readSettings();
+        readPlayers();
         save();
         updatePlayerLabels();
         updatePreview();
       });
     });
-    // 素点入力でプレビュー更新
+
     ids.scores.forEach(id => {
       $(id).addEventListener('input', updatePreview);
     });
